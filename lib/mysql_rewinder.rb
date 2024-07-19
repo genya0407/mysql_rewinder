@@ -2,6 +2,7 @@
 
 require_relative "mysql_rewinder/version"
 require_relative "mysql_rewinder/cleaner"
+require_relative "mysql_rewinder/method_logging"
 require 'set'
 require 'tmpdir'
 require 'fileutils'
@@ -14,6 +15,15 @@ class MysqlRewinder
     delegate %i[clean clean_all record_inserted_table] => :@instance
 
     def setup(db_configs, except_tables: [], adapter: :trilogy, logger: nil)
+      if logger
+        target_classes = MethodLogging.calculate_target_classes
+
+        target_classes.each do |target_class|
+          MethodLogging.prepend_logger_to_singleton_methods(target_class, logger)
+          MethodLogging.prepend_logger_to_instance_methods(target_class, logger)
+        end
+      end
+
       @instance = new(db_configs: db_configs, except_tables: except_tables, adapter: adapter, logger: logger)
     end
   end
