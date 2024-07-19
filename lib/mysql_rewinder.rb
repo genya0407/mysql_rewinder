@@ -37,13 +37,11 @@ class MysqlRewinder
     return unless @initialized_pid
 
     @inserted_tables ||= Set.new
-    sql.split(';').each do |statement|
-      match = statement.match(/\A\s*INSERT(?:\s+IGNORE)?(?:\s+INTO)?\s+(?:\.*[`"]?([^.\s`"(]+)[`"]?)*/i)
-      next unless match
+    new_inserted_tables = extract_inserted_tables(sql)
 
-      table = match[1]
-      @inserted_tables << table if table
-    end
+    return if new_inserted_tables.empty?
+
+    @inserted_tables.merge(new_inserted_tables)
     File.write(
       @inserted_table_record_dir.join("#{@initialized_pid}.#{Process.pid}.inserted_tables").to_s,
       @inserted_tables.to_a.join(',')
@@ -81,5 +79,20 @@ class MysqlRewinder
     aggregated_inserted_tables = calculate_inserted_tables
     @cleaners.each { |c| c.clean(tables: aggregated_inserted_tables) }
     reset_inserted_tables
+  end
+
+  private
+
+  def extract_inserted_tables(sql)
+    insert_tables = Set.new
+    sql.split(';').each do |statement|
+      match = statement.match(/\A\s*INSERT(?:\s+IGNORE)?(?:\s+INTO)?\s+(?:\.*[`"]?([^.\s`"(]+)[`"]?)*/i)
+      next unless match
+
+      table = match[1]
+      insert_tables << table if table
+    end
+
+    insert_tables
   end
 end
